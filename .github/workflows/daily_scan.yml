@@ -20,7 +20,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pandas numpy xgboost scikit-learn ta google-genai feedparser python-dotenv beautifulsoup4 requests lxml packaging xlrd
+          pip install pandas numpy xgboost scikit-learn ta google-genai feedparser python-dotenv beautifulsoup4 requests lxml packaging xlrd ipython setuptools
           pip install vnstock==0.2.9.2.3
 
       - name: Buoc 1 - Train Model (Hoc du lieu moi nhat)
