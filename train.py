@@ -49,23 +49,26 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     np.random.seed(42)
     df['Net_Foreign_Buy'] = np.random.normal(0, 1000000, size=len(df))
     
-    # Target 7 ngày (> 3%)
+    # CHỈ GIỮ LẠI TARGET 7 NGÀY
     df['Future_Close_7d'] = df['close'].shift(-7)
     df['Target_7d'] = (df['Future_Close_7d'] > df['close'] * 1.03).astype(int)
-    
-    # Target 30 ngày (> 5%)
-    df['Future_Close_30d'] = df['close'].shift(-30)
-    df['Target_30d'] = (df['Future_Close_30d'] > df['close'] * 1.05).astype(int)
-    
-    # Target 90 ngày (> 10%)
-    df['Future_Close_90d'] = df['close'].shift(-90)
-    df['Target_90d'] = (df['Future_Close_90d'] > df['close'] * 1.10).astype(int)
     
     return df
 
 def main():
-    print("Bắt đầu tải dữ liệu lịch sử...")
-    tickers = ["VIC", "HAG", "FPT", "HPG", "SSI", "VNM", "VCB", "ACB", "MBB", "TCB","ACV","VJC","GAS","MSN","PVD","PLX","VRE","NVL","KDH","DXG","SAB"]
+    print("Bắt đầu tải dữ liệu lịch sử cho 38 mã...")
+    tickers = [
+        'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'VPB',        
+        'SSI', 'VND', 'MBS', 'VCI', 'HCM',               
+        'VHM', 'VIC', 'NVL', 'DXG', 'KBC', 'IDC',        
+        'HPG', 'HSG', 'NKG',                             
+        'MWG', 'MSN', 'PNJ', 'FRT',                      
+        'GAS', 'PVS', 'PVD', 'POW', 'REE',               
+        'FPT', 'CTR',                                    
+        'HVN', 'VJC', 'GMD',                             
+        'VHC', 'ANV',                                    
+        'VGT', 'TCM'                                     
+    ]
     end_date = datetime.today().strftime('%Y-%m-%d')
     start_date = (datetime.today() - timedelta(days=365*3)).strftime('%Y-%m-%d')
     
@@ -84,14 +87,11 @@ def main():
     full_df = pd.concat(all_data)
     features = ['RSI_14', 'MACD', 'EMA_20', 'EMA_50', 'BB_High', 'BB_Low', 'Daily_Return', 'VNIndex_Return', 'Net_Foreign_Buy']
     
-    # Cấu hình 3 khung thời gian
+    # CHỈ HUẤN LUYỆN 1 KHUNG THỜI GIAN
     timeframes = {
-        '7d': {'target_col': 'Target_7d', 'future_col': 'Future_Close_7d', 'filename': 'xgboost_model_7d.joblib'},
-        '30d': {'target_col': 'Target_30d', 'future_col': 'Future_Close_30d', 'filename': 'xgboost_model_30d.joblib'},
-        '90d': {'target_col': 'Target_90d', 'future_col': 'Future_Close_90d', 'filename': 'xgboost_model_90d.joblib'}
+        '7d': {'target_col': 'Target_7d', 'future_col': 'Future_Close_7d', 'filename': 'xgboost_model_7d.joblib'}
     }
     
-    # Cấu hình không gian tham số (Hyperparameter Grid)
     param_distributions = {
         'n_estimators': [100, 200, 300],
         'max_depth': [3, 4, 5, 6],
@@ -100,7 +100,6 @@ def main():
         'colsample_bytree': [0.8, 1.0]
     }
     
-    # Khởi tạo TimeSeriesSplit để tránh data leakage
     tscv = TimeSeriesSplit(n_splits=3)
     
     for tf_key, tf_config in timeframes.items():
@@ -109,61 +108,42 @@ def main():
         future_col = tf_config['future_col']
         filename = tf_config['filename']
         
-        # Loại bỏ NaNs tùy theo khung shift xa nhất của timeframe tương ứng
         df_train = full_df.dropna(subset=features + [target_col, future_col])
-        
         X = df_train[features]
         y = df_train[target_col]
         
-        # Cắt 20% dòng dữ liệu cuối cùng theo thời gian (Không shuffle) làm Test Set chuẩn
         split_idx = int(len(X) * 0.8)
         X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
         y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
         
         print(f"Số lượng mẫu huấn luyện ({tf_key}): {len(X_train)}")
         
-        # Khởi tạo mô hình nền
-        base_model = XGBClassifier(
-            eval_metric='logloss',
-            random_state=42
-        )
+        base_model = XGBClassifier(eval_metric='logloss', random_state=42)
         
-        # Khởi tạo bộ tìm kiếm RandomizedSearchCV
         random_search = RandomizedSearchCV(
-            estimator=base_model,
-            param_distributions=param_distributions,
-            n_iter=10,                      # Chạy 10 cấu hình thử nghiệm
-            cv=tscv,                        # Dùng TimeSeriesSplit = 3 Fold
-            scoring='accuracy',
-            random_state=42,
-            n_jobs=-1,                      # Chạy đa nhiệm
-            verbose=1                       # In progress
+            estimator=base_model, param_distributions=param_distributions,
+            n_iter=10, cv=tscv, scoring='accuracy', random_state=42, n_jobs=-1, verbose=1
         )
         
-        # Fit tốn time để tìm ra bộ siêu tham số tốt nhất
         random_search.fit(X_train, y_train)
         
         best_model = random_search.best_estimator_
         best_params = random_search.best_params_
-        print(f"\n✅ BỘ THAM SỐ TỐT NHẤT CHO KHUNG {tf_key} LÀ: {best_params}")
+        print(f"\n✅ BỘ THAM SỐ TỐT NHẤT LÀ: {best_params}")
         
-        # Dự đoán Test Set bằng Best Model
         preds = best_model.predict(X_test)
         acc = accuracy_score(y_test, preds)
-        print(f"=> Độ chính xác Test Set ({tf_key}) sau khi tối ưu: {acc:.4f}")
+        print(f"=> Độ chính xác Test Set sau khi tối ưu: {acc:.4f}")
         
         model_data = {
-            'model': best_model,       # Lưu lại mô hình ĐÃ TUNING
-            'features': features,
-            'accuracy': acc,
-            'timeframe': tf_key,
-            'best_params': best_params
+            'model': best_model, 'features': features, 'accuracy': acc,
+            'timeframe': tf_key, 'best_params': best_params
         }
         
         joblib.dump(model_data, filename)
         print(f"Đã lưu mô hình {filename}.")
         
-    print("\n🎉 Hoàn tất quá trình Hyperparameter Tuning cho 3 khung thời gian!")
+    print("\n🎉 Hoàn tất huấn luyện!")
 
 if __name__ == "__main__":
     main()
