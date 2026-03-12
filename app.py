@@ -67,7 +67,7 @@ def fetch_google_news(ticker: str) -> tuple:
     news_titles = []
     latest_url = "#"
     try:
-        query = quote(f"{ticker} chứng khoán")
+        query = quote(f"{ticker} chứng khoán Việt Nam vĩ mô thế giới")
         url = f"https://news.google.com/rss/search?q={query}&hl=vi&gl=VN&ceid=VN:vi"
         feed = feedparser.parse(url)
         for i, entry in enumerate(feed.entries[:4]):
