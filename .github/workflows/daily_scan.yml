@@ -1,0 +1,35 @@
+name: VN Stock Daily Train & Scan
+
+on:
+  schedule:
+    # Chạy lúc 08:40 UTC (Tương đương 15:40 giờ Việt Nam), từ Thứ 2 đến Thứ 6
+    - cron: '40 8 * * 1-5'
+  workflow_dispatch: # Cung cấp nút bấm thủ công trên Github để test
+
+jobs:
+  run-quant-system:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install pandas numpy xgboost scikit-learn vnstock ta google-genai feedparser python-dotenv
+
+      - name: Buoc 1 - Train Model (Hoc du lieu moi nhat)
+        run: python train.py
+
+      - name: Buoc 2 - Predict & Send Email
+        env:
+          GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+        run: python daily_bot.py
